@@ -10,78 +10,30 @@
     let channelList= [];
     let messageList= [];
 
-    story.BindExternalFunction("openChannel", function(channelName) {
-        const isNameEqual= (element) => element.name == channelName;
-        channel = channelList.find(isNameEqual);
-
-        if(channel) {
-            console.error("Warning: Already listening to channel '" + channelName + "'");
-            return;
-        }
-
-        channel = new BroadcastChannel(channelName);
-        channelList.push(channel);
-        messageList.push({
-            "channel":channelName,
-            "messages":[]
-        })
-        console.log("Started listening to channel '" + channelName + "'");
-
-        channel.addEventListener("message", e => {
-            console.log(messageList[0].channel+ " " + messageList[0].messages);
-            const isObjectNameEqual= (element) => element.channel == channelName;
-            channelMessagesObj = messageList.find(isObjectNameEqual);
-            channelMessagesObj.messages.push(e.data);
-            console.log(messageList[0].channel+ " " + messageList[0].messages[0]);
-            console.log("Message received: '" + e.data + "'");
-        })
-    })
-
-    story.BindExternalFunction("closeChannel", function(channelName) {
-        const isNameEqual= (element) => element.name == channelName;
-        let channel = channelList.find(isNameEqual);
-
-        if(channel) {
-            channel.close();
-            console.log("Stopped listening to channel '" + channelName + "'");
-        }
-        else {
-            console.error("Error: Could not stop listening to channel '"+channelName+"' because it doesn't exist");
-        }
-    })
-
-    story.BindExternalFunction("sendMessage", function(x,channelName) {
-        const isNameEqual= (element) => element.name == channelName;
-        let channel = channelList.find(isNameEqual);
-
-        if(channel) {
-            channel.postMessage(x);
-            console.log("Message sent: '" + x + "'");
-        }
-        else {
-            console.error("Error: Could not send message '"+ x +"' to channel '" + channelName + "' because it doesn't exist");
-        }
-    })
-
     story.BindExternalFunction("getMessage", function(channelName,fallback,op) {
-        const isNameEqual= (element) => element.channel == channelName;
+        const isNameEqual= (element) => element.channel === channelName;
         let channelMessagesObj = messageList.find(isNameEqual);
 
         if(channelMessagesObj) {
             switch(op) {
                 case "ignore":
-                    console.log("getMessage operation 'ignore': found " + channelName + " and no action taken");
+                    console.log("getMessage operation 'ignore': found " + channelMessagesObj.channel + " and no action taken");
                     return;
                 case "pop":
-                    console.log("getMessage operation 'pop': found " + channelName + " and popping message");
-                    if(!channelMessagesObj.messages.length) return fallback;
+                    console.log("pop "+messageList);
+                    console.log("getMessage operation 'pop': found " + channelMessagesObj.channel + " and popping message");
+                    if(!channelMessagesObj.messages.length){
+                        console.log(channelMessagesObj.messages.length);
+                        return fallback;
+                    }
+                    console.log(channelMessagesObj.messages[channelMessagesObj.messages.length-1]);
                     return channelMessagesObj.messages.pop();
                 case "shift":
-                    console.log("getMessage operation 'shift': found " + channelName + " and shifting message");
+                    console.log("getMessage operation 'shift': found " + channelMessagesObj.channel + " and shifting message");
                     if(!channelMessagesObj.messages.length) return fallback;
                     return channelMessagesObj.messages.shift();
                 case "read":
-                    console.log("getMessage operation 'read': found " + channelName + " and reading messages");
+                    console.log("getMessage operation 'read': found " + channelMessagesObj.channel + " and reading messages");
                     if(!channelMessagesObj.messages.length) return fallback;
                     return channelMessagesObj.messages;
             }
@@ -96,6 +48,8 @@
     // We support:
     //  # theme: dark
     //  # author: Your Name
+    //  # checkothertabs: game name
+
     var globalTags = story.globalTags;
     if( globalTags ) {
         for(var i=0; i<story.globalTags.length; i++) {
@@ -111,6 +65,21 @@
             else if( splitTag && splitTag.property == "author" ) {
                 var byline = document.querySelector('.byline');
                 byline.innerHTML = "by "+splitTag.val;
+            }
+
+            // checkothertabs: game name
+            else if( splitTag && splitTag.property == "checkothertabs") {
+                localStorage.openpages = Date.now();
+                var onLocalStorageEvent = function(e){
+                    if(e.key == "openpages"){
+                        // Listen if anybody else opening the same page!
+                        localStorage.page_available = Date.now();
+                    }
+                    if(e.key == "page_available"){
+                        console.log("One more page already open");
+                    }
+                };
+                window.addEventListener('storage', onLocalStorageEvent, false);
             }
         }
     }
@@ -165,7 +134,7 @@
                 // OPENCHANNEL: channelname
                 else if( splitTag && splitTag.property == "openchannel"){
                     const isNameEqual= (element) => element.name == splitTag.val;
-                    channel = channelList.find(isNameEqual);
+                    let channel = channelList.find(isNameEqual);
             
                     if(channel) {
                         console.error("Warning: Already listening to channel '" + splitTag.val + "'");
@@ -177,14 +146,14 @@
                             "channel":splitTag.val,
                             "messages":[]
                         })
-                        console.log("Started listening to channel '" + splitTag.val + "'");
+                        console.log("Started listening to channel '" + splitTag.val + "'. Number of opened channels:" + messageList.length);
                 
                         channel.addEventListener("message", e => {
-                            const isObjectNameEqual= (element) => element.channel == splitTag.val;
+                            const isObjectNameEqual= (element) => element.channel === channel.name;
                             channelMessagesObj = messageList.find(isObjectNameEqual);
                             channelMessagesObj.messages.push(e.data);
-                            console.log(messageList[0].channel+ " " + messageList[0].messages);
-                            console.log("Message received: '" + e.data + "'");
+                            console.log("Message received: '" + e.data + "'. Number of messages in channel:" + channelMessagesObj.messages.length);
+                            console.log(channelMessagesObj);
                         })
                     }
                 }
@@ -210,7 +179,7 @@
 
                     if(channel) {
                         channel.postMessage(splitTag.val);
-                        console.log("Message sent: '" + splitTag.val + "'");
+                        console.log("Message sent: '" + splitTag.val + "' to '" + channel.name + "'");
                     }
                     else {
                         console.error("Error: Could not send message '"+ splitTag.val +"' to channel '" + splitTag.property + "' because it doesn't exist");
