@@ -9,6 +9,7 @@
 
     let channelList= [];
     let messageList= [];
+    let otherTabs= 0;
 
     story.BindExternalFunction("getMessage", function(channelName,fallback,op) {
         const isNameEqual= (element) => element.channel === channelName;
@@ -41,6 +42,10 @@
         else {
             console.error("Error: Could not retrieve message from channel '" + channelName + "' because it doesn't exist. Using fallback '" + fallback +"'.");
         }
+    })
+
+    story.BindExternalFunction("getNumTabs", function() {
+        return otherTabs;
     })
 
 
@@ -76,7 +81,8 @@
                         localStorage.page_available = Date.now();
                     }
                     if(e.key == "page_available"){
-                        console.log("One more page already open");
+                        console.log("Detected another instance of " + splitTag.val);
+                        otherTabs++;
                     }
                 };
                 window.addEventListener('storage', onLocalStorageEvent, false);
@@ -173,7 +179,7 @@
                 }
 
                 // CHANNELNAME: message
-                else if( splitTag && splitTag.property != "theme" && splitTag.property != "author" && splitTag.property != "title" ){
+                else if( splitTag && splitTag.property != "theme" && splitTag.property != "author" && splitTag.property != "title" && splitTag.property != "checkothertabs" ){
                     const isNameEqual= (element) => element.name == splitTag.property;
                     let channel = channelList.find(isNameEqual);
 
